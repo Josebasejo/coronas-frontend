@@ -1,0 +1,30 @@
+DATOS GENERALES:
+	- MODELO
+	- SECCION
+	- FECHA
+PRENSA: (Que aparezca el titulo de CHAPAS , PRESION y POSICION CORREDERA como subtitulos encima de donde le corresponde)
+	-CHAPAS:
+		* TALO SUP
+		* TALO INF
+		* PREPARAR
+		* ESTAMPAR
+	-PRESION:
+		* 1ºOP + 3ºOP
+		* 2ºOP + 4ºOP
+	-POSICION CORREDERA
+LUBRICACION: (Tambien como titulo, Que vaya por filas, es decir, 1ºOP se divide en dos filas 2/2/2; la primera columna agua, segunda grafito, tercera aire, que lo ponga encima de cada columna en las 4 opciones)
+	-1ºOP: (6 CASILLAS DISTRIBUIDAS EN 2/2/2 UNA ENCIMA DE LA OTRA)
+	-2ºOP: (6 CASILLAS DISTRIBUIDAS EN 2/2/2 UNA ENCIMA DE LA OTRA)
+	-3ºOP: (6 CASILLAS DISTRIBUIDAS EN 2/2/2 UNA ENCIMA DE LA OTRA)
+	-4ºOP: (6 CASILLAS DISTRIBUIDAS EN 2/2/2 UNA ENCIMA DE LA OTRA)
+EXPULSADORES: (cada opción en vertical, es decir, 1ºop y debajo en vertical las 6 casillas) y que aparezcan las 4 como si fueran cuatro columnas.
+	-1ºOP: COTA SUP, CONTA INF, 1%, 2%, V1%, V2% (6 CASILLAS EN TOTAL)
+	-2ºOP: COTA SUP, CONTA INF, 1%, 2%, V1%, V2% (6 CASILLAS EN TOTAL)
+	-3ºOP: COTA SUP, CONTA INF, 1%, 2%, V1%, V2% (6 CASILLAS EN TOTAL)
+	-4ºOP: COTA SUP, CONTA INF, 1%, 2%, V1%, V2% (6 CASILLAS EN TOTAL)
+
+HORNO: (También como titulo, dividido en 4 columnas: Bobina 1, Bobina 2, Bobina 3 y Tiempo Ciclo, y debajo de cada una se inserte el valor)
+VELOCIDAD ROBOTS: También como título, 3 columnas: Robot 1, Robot 2 y Robot 3, debajo insertar el valor.
+CINTAS: También como titulo, 2 columnas, CINTA a HORNO IOB y CINTA ENFRIAMIENTO
+HORNO IOB: También como titulo, con 7 Columnas llamadas: Pre-Camara, Camara 1, Camara 2, Camara 3, Camara 4, Camara 5, Camara 6 y Tiempo Ciclo.
+OBSERVACIONES: También como titulo, con un recuadro para insertar texto, que vaya a lo ancho de la página.
