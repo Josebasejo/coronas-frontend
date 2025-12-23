@@ -1,64 +1,37 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
-import FichaModeloWeb from "./pages/FichaModeloWeb";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+
+// ✅ Importamos todas las páginas
+import Dashboard from "./pages/Dashboard";
 import SeccionPage from "./pages/SeccionPage";
-import CrearModeloPage from "./pages/CrearModeloPage";
+import ModelosPorSeccion from "./pages/ModelosPorSeccion";
+import FichaModeloWeb from "./pages/FichaModeloWeb";
+import Login from "./pages/Login";
 
-
-//
-// 🏠 COMPONENTE PRINCIPAL - DASHBOARD
-//
-function Dashboard() {
-  const secciones = ["1207", "2204", "3203"];
-
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-100 to-gray-300 flex flex-col items-center justify-center">
-      <h1 className="text-4xl font-bold text-blue-800 mb-10">
-        🧰 Dashboard - Coronas
-      </h1>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {secciones.map((sec) => (
-          <Link
-            key={sec}
-            to={`/seccion/${sec}`}
-            className="bg-blue-700 text-white text-xl font-semibold px-8 py-6 rounded-2xl shadow-lg hover:bg-blue-800 transition text-center"
-          >
-            Sección {sec}
-          </Link>
-        ))}
-
-        <button
-          onClick={() => window.close()}
-          className="bg-red-600 text-white text-xl font-semibold px-8 py-6 rounded-2xl shadow-lg hover:bg-red-700 transition text-center"
-        >
-          🚪 SALIR
-        </button>
-      </div>
-    </div>
-  );
-}
-
-//
-// 🧩 APP PRINCIPAL (ENRUTADOR)
-//
 export default function App() {
+  // Leemos el rol del usuario desde el almacenamiento local (por defecto, invitado)
+  const role = localStorage.getItem("role") || "guest";
+
   return (
-    <Router>
-      <Routes>
-        {/* DASHBOARD PRINCIPAL */}
-        <Route path="/" element={<Dashboard />} />
+    <div className="min-h-screen bg-gray-100">
+      <Router>
+        <Routes>
+          {/* 🌐 Pantalla principal (Dashboard) */}
+          <Route path="/" element={<Dashboard role={role} />} />
 
-        {/* SECCIÓN: muestra los modelos filtrados */}
-        <Route path="/seccion/:codigo" element={<SeccionPage />} />
+          {/* 🏭 Menú de sección (Ver modelos / Crear / Volver) */}
+          <Route path="/seccion" element={<SeccionPage role={role} />} />
 
-        {/* FICHA TÉCNICA DE MODELO */}
-        <Route path="/fichaweb/:id" element={<FichaModeloWeb />} />
+          {/* 📋 Listado de modelos filtrado por sección */}
+          <Route path="/modelos" element={<ModelosPorSeccion role={role} />} />
 
-	{/* FICHA CREAR DE MODELO */}
-	<Route path="/crear-modelo/:seccion" element={<CrearModeloPage />} />
+          {/* 🧾 Ficha editable o visual del modelo */}
+          <Route path="/ficha" element={<FichaModeloWeb role={role} />} />
 
-      </Routes>
-    </Router>
+          {/* 🔐 Inicio de sesión del administrador */}
+          <Route path="/login" element={<Login />} />
+        </Routes>
+      </Router>
+    </div>
   );
 }

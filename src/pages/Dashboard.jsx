@@ -1,30 +1,51 @@
-export default function Dashboard() {
-  const secciones = ["1207", "2204", "3203"];
+import React from "react";
+import { useNavigate } from "react-router-dom";
+
+export default function Dashboard({ role }) {
+  const navigate = useNavigate();
+
+  const abrirSeccion = (seccion) => {
+    localStorage.setItem("seccionSeleccionada", seccion);
+    navigate("/seccion");
+  };
+
+  const cerrarSesion = () => {
+    localStorage.removeItem("role");
+    window.location.reload();
+  };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-blue-900 to-blue-600 text-white">
-      <h1 className="text-4xl md:text-5xl font-bold mb-12 drop-shadow-lg">
-        CORONAS - Por Joseba
-      </h1>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-gray-300 text-center">
+      <img src="/logo_cie.png" alt="CIE Automotive" className="w-24 mb-4 drop-shadow-md" />
+      <h1 className="text-3xl font-bold text-gray-800 mb-8">CORONAS - Puesta a Punto</h1>
 
-      <div className="grid grid-cols-2 gap-6 w-11/12 max-w-xl">
-        {secciones.map(sec => (
-          <a
-            key={sec}
-            href={`/seccion/${sec}`}
-            className="px-8 py-6 bg-white text-blue-700 font-bold text-xl md:text-2xl rounded-2xl shadow-lg hover:scale-105 hover:bg-blue-50 transition-all duration-200 text-center"
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-80">
+        {["1207", "2204", "3203"].map((seccion) => (
+          <button
+            key={seccion}
+            onClick={() => abrirSeccion(seccion)}
+            className="bg-blue-600 text-white py-4 rounded-lg text-xl font-semibold shadow-md hover:bg-blue-700 transition-all duration-300"
           >
-            SECCIÓN {sec}
-          </a>
+            🏭 SECCIÓN {seccion}
+          </button>
         ))}
-
-        <a
-          href="/gestion-modelos"
-          className="col-span-2 px-8 py-6 bg-yellow-400 text-blue-900 font-bold text-xl md:text-2xl rounded-2xl shadow-lg hover:bg-yellow-300 hover:scale-105 transition-all duration-200 text-center"
-        >
-          GESTIONAR MODELOS
-        </a>
       </div>
+
+      <button
+        onClick={cerrarSesion}
+        className="mt-10 bg-gray-600 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-gray-700 transition-all duration-300"
+      >
+        🚪 SALIR
+      </button>
+
+      {role === "guest" && (
+        <button
+          onClick={() => navigate("/login")}
+          className="mt-4 text-blue-600 underline text-sm hover:text-blue-800"
+        >
+          🔐 Entrar como Administrador
+        </button>
+      )}
     </div>
   );
 }

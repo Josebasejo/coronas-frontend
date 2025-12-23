@@ -1,3 +1,10 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Evita que html2canvas corte bloques de ficha por la mitad */
+.page-break {
+  page-break-before: always;
+  break-before: page;
+  margin-top: 20px;
+}
