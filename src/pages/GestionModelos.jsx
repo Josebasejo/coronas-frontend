@@ -1,67 +1,80 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function GestionModelos() {
   const [modelos, setModelos] = useState([]);
-  const API_URL = "https://coronas-backend.onrender.com/api/modelos"; // 👈 tu backend en Render
+  const navigate = useNavigate();
 
-  // 🔄 Cargar modelos al entrar
-  useEffect(() => {
-    fetch(API_URL)
-      .then((res) => res.json())
-      .then((data) => setModelos(data))
-      .catch((err) => console.error("Error al cargar modelos:", err));
-  }, []);
-
-  // 🗑️ Eliminar un modelo
-  const eliminarModelo = async (id) => {
-    if (!window.confirm("¿Seguro que quieres eliminar este modelo?")) return;
-
-    await fetch(`${API_URL}/${id}`, { method: "DELETE" });
-    setModelos(modelos.filter((m) => m.id !== id));
+  const cargarModelos = async () => {
+    const res = await fetch("https://coronas-backend.onrender.com/api/modelos");
+    const data = await res.json();
+    setModelos(data);
   };
 
+  const eliminarModelo = async (modelo) => {
+    if (!window.confirm(`¿Seguro que deseas eliminar "${modelo.modelo}"?`)) return;
+    await fetch(`https://coronas-backend.onrender.com/api/modelos/${modelo.id}`, {
+      method: "DELETE",
+    });
+    cargarModelos();
+  };
+
+  useEffect(() => {
+    cargarModelos();
+  }, []);
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-100 to-gray-300 p-6 flex flex-col items-center">
-      <h1 className="text-3xl font-bold text-blue-700 mb-6">
-        Gestión de Modelos
-      </h1>
+    <div className="min-h-screen bg-[#111827] text-white flex flex-col items-center py-10">
+      <h1 className="text-3xl font-semibold mb-6">Gestión de Modelos</h1>
 
-      <table className="w-full max-w-4xl bg-white shadow-xl rounded-lg overflow-hidden">
-        <thead className="bg-blue-700 text-white">
-          <tr>
-            <th className="p-3 text-left">Modelo</th>
-            <th className="p-3 text-left">Sección</th>
-            <th className="p-3 text-left">Cliente</th>
-            <th className="p-3 text-left">Fecha</th>
-            <th className="p-3 text-center">Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {modelos.map((m) => (
-            <tr key={m.id} className="border-b hover:bg-gray-100 transition">
-              <td className="p-3">{m.modelo}</td>
-              <td className="p-3">{m.seccion}</td>
-              <td className="p-3">{m.cliente}</td>
-              <td className="p-3">{m.fecha}</td>
-              <td className="p-3 text-center">
-                <button
-                  onClick={() => eliminarModelo(m.id)}
-                  className="bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700 transition"
-                >
-                  Eliminar
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {modelos.length === 0 ? (
+        <p className="text-gray-400">No hay modelos en la base de datos.</p>
+      ) : (
+        <div className="w-full max-w-4xl bg-gray-800 rounded-xl p-6 shadow-lg">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-gray-600">
+                <th className="p-3">Sección</th>
+                <th className="p-3">Modelo</th>
+                <th className="p-3">Cliente</th>
+                <th className="p-3">Fecha</th>
+                <th className="p-3 text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {modelos.map((m) => (
+                <tr key={m.id} className="border-b border-gray-700 hover:bg-gray-700">
+                  <td className="p-3">{m.seccion}</td>
+                  <td className="p-3">{m.modelo}</td>
+                  <td className="p-3">{m.cliente}</td>
+                  <td className="p-3">{m.fecha}</td>
+                  <td className="p-3 text-right flex justify-end gap-3">
+                    <button
+                      onClick={() => navigate(`/ficha/${m.id}`)}
+                      className="bg-blue-600 px-4 py-1 rounded-lg hover:bg-blue-500"
+                    >
+                      Ver
+                    </button>
+                    <button
+                      onClick={() => eliminarModelo(m)}
+                      className="bg-red-600 px-4 py-1 rounded-lg hover:bg-red-500"
+                    >
+                      Eliminar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-      <a
-        href="/"
-        className="mt-8 inline-block bg-blue-700 text-white px-6 py-3 rounded-xl shadow-md hover:bg-blue-800 transition"
+      <button
+        onClick={() => navigate("/")}
+        className="mt-10 bg-gray-700 hover:bg-gray-600 py-3 px-8 rounded-xl font-semibold text-white transition-all"
       >
         Volver al Dashboard
-      </a>
+      </button>
     </div>
   );
 }

@@ -1,63 +1,91 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import logo from "../assets/logo_cie_blanco.png";
 
-export default function Login() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+export default function Login({ actualizarRol }) {
   const navigate = useNavigate();
+  const [usuario, setUsuario] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
-  const handleLogin = (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
+    setError("");
 
-    // 🔒 Datos de acceso
-    if (username === "admin" && password === "CIE2025") {
-      localStorage.setItem("role", "admin");
-      navigate("/");
-    } else {
-      alert("❌ Credenciales incorrectas. Inténtalo de nuevo.");
+    // Credenciales (las que dijiste que estabas usando)
+    const USER_OK = "admin";
+    const PASS_OK = "CIE2025";
+
+    if (usuario === USER_OK && password === PASS_OK) {
+      localStorage.setItem("rol", "admin");
+
+      // ✅ Aquí estaba el fallo: ahora usamos actualizarRol
+      if (typeof actualizarRol === "function") {
+        actualizarRol("admin");
+      }
+
+      // Ir al dashboard admin
+      navigate("/dashboard", { replace: true });
+      return;
     }
+
+    setError("Credenciales incorrectas.");
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-300">
-      <div className="bg-white shadow-lg rounded-xl p-10 w-96 text-center">
-        <img
-          src="/logo_cie.png"
-          alt="Logo CIE"
-          className="w-20 mx-auto mb-6 drop-shadow-md"
-        />
-        <h1 className="text-2xl font-semibold text-gray-800 mb-6">
-          Acceso Administrador
-        </h1>
-        <form onSubmit={handleLogin}>
-          <input
-            type="text"
-            placeholder="Usuario"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="w-full mb-4 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="password"
-            placeholder="Contraseña"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full mb-6 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+    <div className="min-h-screen bg-[#0f172a] text-white flex items-center justify-center p-6">
+      <div className="w-full max-w-md bg-gray-800 rounded-2xl shadow-xl p-8">
+        <div className="flex flex-col items-center mb-6">
+          <img src={logo} alt="CIE Automotive" className="w-44 mb-4 select-none" />
+          <h1 className="text-2xl font-bold text-cyan-400">Acceso Administrador</h1>
+          <p className="text-gray-400 text-sm mt-1">
+            Entra para crear, editar y eliminar modelos.
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm mb-1 text-gray-300">Usuario</label>
+            <input
+              className="w-full rounded-lg p-3 text-black"
+              value={usuario}
+              onChange={(e) => setUsuario(e.target.value)}
+              autoComplete="username"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm mb-1 text-gray-300">Contraseña</label>
+            <input
+              type="password"
+              className="w-full rounded-lg p-3 text-black"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+            />
+          </div>
+
+          {error && (
+            <div className="bg-red-600/20 border border-red-500/40 text-red-200 rounded-lg p-3 text-sm">
+              {error}
+            </div>
+          )}
+
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition duration-300"
+            className="w-full bg-gradient-to-r from-cyan-600 to-cyan-400 hover:from-cyan-500 hover:to-cyan-300 text-white font-semibold py-3 rounded-xl shadow-lg transition"
           >
             Entrar
           </button>
-        </form>
 
-        <button
-          onClick={() => navigate("/")}
-          className="w-full mt-4 text-gray-600 underline text-sm hover:text-blue-600"
-        >
-          Volver al Dashboard
-        </button>
+          <button
+            type="button"
+            onClick={() => navigate("/", { replace: true })}
+            className="w-full text-gray-300 hover:text-cyan-300 text-sm underline mt-2"
+          >
+            Volver al modo invitado
+          </button>
+        </form>
       </div>
     </div>
   );

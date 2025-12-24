@@ -1,37 +1,49 @@
-import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
-// ✅ Importamos todas las páginas
 import Dashboard from "./pages/Dashboard";
+import DashboardInvitado from "./pages/DashboardInvitado";
 import SeccionPage from "./pages/SeccionPage";
-import ModelosPorSeccion from "./pages/ModelosPorSeccion";
 import FichaModeloWeb from "./pages/FichaModeloWeb";
+import GestionModelos from "./pages/GestionModelos";
 import Login from "./pages/Login";
 
 export default function App() {
-  // Leemos el rol del usuario desde el almacenamiento local (por defecto, invitado)
-  const role = localStorage.getItem("role") || "guest";
+  const [rol, setRol] = useState(localStorage.getItem("rol") || "invitado");
+
+  useEffect(() => {
+    if (!localStorage.getItem("rol")) {
+      localStorage.setItem("rol", "invitado");
+      setRol("invitado");
+    }
+  }, []);
+
+  const actualizarRol = (nuevoRol) => {
+    setRol(nuevoRol);
+    localStorage.setItem("rol", nuevoRol);
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <Router>
-        <Routes>
-          {/* 🌐 Pantalla principal (Dashboard) */}
-          <Route path="/" element={<Dashboard role={role} />} />
+    <Router>
+      <Routes>
+        <Route path="/" element={<DashboardInvitado actualizarRol={actualizarRol} />} />
+        <Route path="/login" element={<Login actualizarRol={actualizarRol} />} />
 
-          {/* 🏭 Menú de sección (Ver modelos / Crear / Volver) */}
-          <Route path="/seccion" element={<SeccionPage role={role} />} />
+        <Route
+          path="/dashboard"
+          element={rol === "admin" ? <Dashboard /> : <Navigate to="/" replace />}
+        />
 
-          {/* 📋 Listado de modelos filtrado por sección */}
-          <Route path="/modelos" element={<ModelosPorSeccion role={role} />} />
+        <Route path="/seccion/:seccion" element={<SeccionPage />} />
+        <Route path="/ficha/:id" element={<FichaModeloWeb />} />
 
-          {/* 🧾 Ficha editable o visual del modelo */}
-          <Route path="/ficha" element={<FichaModeloWeb role={role} />} />
+        <Route
+          path="/gestion-modelos"
+          element={rol === "admin" ? <GestionModelos /> : <Navigate to="/" replace />}
+        />
 
-          {/* 🔐 Inicio de sesión del administrador */}
-          <Route path="/login" element={<Login />} />
-        </Routes>
-      </Router>
-    </div>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Router>
   );
 }

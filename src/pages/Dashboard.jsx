@@ -1,51 +1,48 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import logo from "../assets/logo_cie_blanco.png";
 
-export default function Dashboard({ role }) {
+export default function Dashboard() {
   const navigate = useNavigate();
 
-  const abrirSeccion = (seccion) => {
+  const handleVerSeccion = (seccion) => {
     localStorage.setItem("seccionSeleccionada", seccion);
-    navigate("/seccion");
+    navigate(`/seccion/${seccion}`);
   };
 
-  const cerrarSesion = () => {
-    localStorage.removeItem("role");
-    window.location.reload();
+  const handleLogout = () => {
+    localStorage.setItem("rol", "invitado");
+    navigate("/");
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-gray-300 text-center">
-      <img src="/logo_cie.png" alt="CIE Automotive" className="w-24 mb-4 drop-shadow-md" />
-      <h1 className="text-3xl font-bold text-gray-800 mb-8">CORONAS - Puesta a Punto</h1>
+    <div className="min-h-screen bg-[#0f172a] text-white flex flex-col items-center justify-center p-8">
+      <img src={logo} alt="CIE Automotive" className="w-64 mb-8 select-none" />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-80">
+      <h1 className="text-4xl font-bold text-cyan-400 mb-8 tracking-wide">
+        CORONAS - Panel de Administrador
+      </h1>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
         {["1207", "2204", "3203"].map((seccion) => (
           <button
             key={seccion}
-            onClick={() => abrirSeccion(seccion)}
-            className="bg-blue-600 text-white py-4 rounded-lg text-xl font-semibold shadow-md hover:bg-blue-700 transition-all duration-300"
+            onClick={() => handleVerSeccion(seccion)}
+            className="bg-gradient-to-r from-cyan-700 to-cyan-500 text-white text-xl font-semibold py-6 px-12 rounded-2xl shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-cyan-500/40"
           >
-            🏭 SECCIÓN {seccion}
+            {seccion}
           </button>
         ))}
       </div>
 
-      <button
-        onClick={cerrarSesion}
-        className="mt-10 bg-gray-600 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-gray-700 transition-all duration-300"
-      >
-        🚪 SALIR
-      </button>
-
-      {role === "guest" && (
+      <div className="mt-12">
         <button
-          onClick={() => navigate("/login")}
-          className="mt-4 text-blue-600 underline text-sm hover:text-blue-800"
+          onClick={handleLogout}
+          className="bg-red-600 hover:bg-red-700 px-8 py-3 rounded-lg font-semibold text-lg transition shadow-lg hover:shadow-red-500/40"
         >
-          🔐 Entrar como Administrador
+          Cerrar sesión
         </button>
-      )}
+      </div>
     </div>
   );
 }

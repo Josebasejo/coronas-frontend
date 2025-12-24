@@ -1,130 +1,227 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { API_BASE } from "../config";
 
-export default function SeccionPage({ role }) {
+function getNombreModelo(m) {
+  return m?.modelo || m?.nombre || m?.Modelo || m?.Nombre || "";
+}
+
+export default function SeccionPage() {
   const navigate = useNavigate();
-  const seccion = localStorage.getItem("seccionSeleccionada") || "Sin sección";
-  const [showModal, setShowModal] = useState(false);
-  const [nuevoModelo, setNuevoModelo] = useState({
-    modelo: "",
-    cliente: "",
-  });
+  const { seccion } = useParams();
 
-  const abrirModelos = () => {
-    navigate("/modelos");
+  const [rol, setRol] = useState(localStorage.getItem("rol") || "invitado");
+  const isAdmin = useMemo(() => rol === "admin", [rol]);
+
+  const [modelos, setModelos] = useState([]);
+  const [cargando, setCargando] = useState(true);
+
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [nuevoModelo, setNuevoModelo] = useState("");
+  const [nuevoCliente, setNuevoCliente] = useState("");
+
+  useEffect(() => {
+    if (seccion) localStorage.setItem("seccionSeleccionada", seccion);
+  }, [seccion]);
+
+  useEffect(() => {
+    const syncRol = () => setRol(localStorage.getItem("rol") || "invitado");
+    syncRol();
+    window.addEventListener("storage", syncRol);
+    return () => window.removeEventListener("storage", syncRol);
+  }, []);
+
+  const cargarModelos = async () => {
+    setCargando(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/secciones/${seccion}/modelos`);
+      if (!res.ok) throw new Error("No se pudo cargar la lista");
+      const data = await res.json();
+      setModelos(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error(e);
+      setModelos([]);
+    } finally {
+      setCargando(false);
+    }
   };
 
-  const volverAlDashboard = () => {
-    navigate("/");
+  useEffect(() => {
+    cargarModelos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seccion]);
+
+  const handleEliminar = async (id, nombreMostrado) => {
+    if (!isAdmin) return;
+
+    const ok = window.confirm(
+      `¿Seguro que deseas eliminar "${nombreMostrado}"?\n\nSe eliminará el registro y su ficha asociada.`
+    );
+    if (!ok) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/modelos/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("DELETE falló");
+      setModelos((prev) => prev.filter((m) => m.id !== id));
+      alert("✅ Eliminado correctamente");
+    } catch (e) {
+      console.error(e);
+      alert("❌ Error al eliminar");
+    }
   };
 
-  const guardarModelo = () => {
-    if (role !== "admin") {
-      alert("⚠️ Solo los administradores pueden crear modelos.");
+  const handleCrear = async (e) => {
+    e.preventDefault();
+    if (!isAdmin) return;
+
+    const modelo = nuevoModelo.trim();
+    const cliente = nuevoCliente.trim();
+
+    if (!modelo) {
+      alert("❌ El nombre de modelo es obligatorio.");
       return;
     }
 
-    const { modelo, cliente } = nuevoModelo;
-    if (!modelo || !cliente) {
-      alert("❌ Todos los campos son obligatorios.");
-      return;
-    }
+    try {
+      const res = await fetch(`${API_BASE}/api/modelos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          seccion,
+          modelo,
+          nombre: modelo, // compatibilidad
+          cliente,
+          fecha: new Date().toISOString().split("T")[0],
+        }),
+      });
 
-    fetch("https://coronas-backend.onrender.com/api/modelos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        modelo,
-        cliente,
-        seccion,
-      }),
-    })
-      .then((res) => res.json())
-      .then(() => {
-        alert(`✅ Modelo "${modelo}" creado correctamente.`);
-        setShowModal(false);
-        setNuevoModelo({ modelo: "", cliente: "" });
-      })
-      .catch((err) => console.error("Error al crear modelo:", err));
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`POST falló: ${res.status} ${txt}`);
+      }
+
+      setNuevoModelo("");
+      setNuevoCliente("");
+      setMostrarForm(false);
+      await cargarModelos();
+      alert(`✅ Modelo "${modelo}" creado correctamente.`);
+    } catch (e2) {
+      console.error(e2);
+      alert("❌ Error al crear el modelo.");
+    }
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-gray-300 text-center">
-      <img src="/logo_cie.png" alt="CIE Automotive" className="w-24 mb-4 drop-shadow-md" />
-      <h1 className="text-3xl font-bold text-gray-800 mb-8">
-        SECCIÓN {seccion}
-      </h1>
+    <div className="min-h-screen bg-[#0f172a] text-white p-8 flex flex-col items-center">
+      <h1 className="text-3xl font-bold text-cyan-400 mb-6">SECCIÓN {seccion}</h1>
 
-      <div className="grid grid-cols-1 gap-6 w-80">
-        <button
-          onClick={abrirModelos}
-          className="bg-blue-600 text-white py-4 rounded-lg text-xl font-semibold shadow-md hover:bg-blue-700 transition-all duration-300"
-        >
-          📋 Ver Modelos
-        </button>
+      <div className="w-full max-w-4xl bg-gray-800 p-6 rounded-xl shadow-lg">
+        {cargando ? (
+          <p className="text-gray-400 text-center">Cargando modelos…</p>
+        ) : modelos.length === 0 ? (
+          <p className="text-gray-400 text-center">
+            No hay modelos registrados en esta sección.
+          </p>
+        ) : (
+          <ul className="divide-y divide-gray-700">
+            {modelos.map((m) => {
+              const nombreMostrado = getNombreModelo(m) || "Sin nombre";
+              return (
+                <li key={m.id} className="flex justify-between items-center py-3">
+                  <div className="flex flex-col">
+                    <span className="font-semibold">{nombreMostrado}</span>
+                    {m.cliente ? (
+                      <span className="text-xs text-gray-400">Cliente: {m.cliente}</span>
+                    ) : null}
+                  </div>
 
-        {role === "admin" && (
-          <button
-            onClick={() => setShowModal(true)}
-            className="bg-green-600 text-white py-4 rounded-lg text-xl font-semibold shadow-md hover:bg-green-700 transition-all duration-300"
-          >
-            ➕ Crear Modelo
-          </button>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => navigate(`/ficha/${m.id}`)}
+                      className="bg-cyan-600 hover:bg-cyan-700 px-4 py-2 rounded-lg font-semibold transition"
+                    >
+                      Ver ficha
+                    </button>
+
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleEliminar(m.id, nombreMostrado)}
+                        className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg font-semibold transition"
+                      >
+                        Eliminar
+                      </button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         )}
-
-        <button
-          onClick={volverAlDashboard}
-          className="bg-gray-600 text-white py-4 rounded-lg text-xl font-semibold shadow-md hover:bg-gray-700 transition-all duration-300"
-        >
-          ⬅️ Volver al Dashboard
-        </button>
       </div>
 
-      {/* MODAL CREAR MODELO */}
-      {showModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm z-50">
-          <div className="bg-white p-8 rounded-xl shadow-xl w-96">
-            <h2 className="text-2xl font-semibold mb-4 text-gray-800 text-center">
+      {isAdmin && (
+        <div className="w-full max-w-4xl mt-6">
+          {!mostrarForm ? (
+            <button
+              onClick={() => setMostrarForm(true)}
+              className="w-full bg-green-600 hover:bg-green-700 px-8 py-3 rounded-xl font-semibold transition shadow-lg"
+            >
               Crear nuevo modelo
-            </h2>
+            </button>
+          ) : (
+            <form onSubmit={handleCrear} className="bg-gray-800 p-6 rounded-xl shadow-lg">
+              <h2 className="text-xl font-bold text-cyan-400 mb-4">
+                Nuevo modelo (Sección {seccion})
+              </h2>
 
-            <input
-              type="text"
-              placeholder="Nombre del modelo"
-              value={nuevoModelo.modelo}
-              onChange={(e) =>
-                setNuevoModelo({ ...nuevoModelo, modelo: e.target.value })
-              }
-              className="w-full mb-3 px-4 py-2 border border-gray-300 rounded-md"
-            />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm mb-1">Modelo</label>
+                  <input
+                    value={nuevoModelo}
+                    onChange={(e) => setNuevoModelo(e.target.value)}
+                    className="w-full rounded-lg p-3 text-black"
+                    placeholder="Ej: 15196"
+                  />
+                </div>
 
-            <input
-              type="text"
-              placeholder="Cliente"
-              value={nuevoModelo.cliente}
-              onChange={(e) =>
-                setNuevoModelo({ ...nuevoModelo, cliente: e.target.value })
-              }
-              className="w-full mb-6 px-4 py-2 border border-gray-300 rounded-md"
-            />
+                <div>
+                  <label className="block text-sm mb-1">Cliente</label>
+                  <input
+                    value={nuevoCliente}
+                    onChange={(e) => setNuevoCliente(e.target.value)}
+                    className="w-full rounded-lg p-3 text-black"
+                    placeholder="Ej: Cliente Demo"
+                  />
+                </div>
+              </div>
 
-            <div className="flex justify-between">
-              <button
-                onClick={() => setShowModal(false)}
-                className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-all duration-200"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={guardarModelo}
-                className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-all duration-200"
-              >
-                Guardar
-              </button>
-            </div>
-          </div>
+              <div className="flex gap-3 mt-5">
+                <button
+                  type="submit"
+                  className="bg-cyan-600 hover:bg-cyan-700 px-6 py-3 rounded-lg font-semibold transition"
+                >
+                  Crear
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMostrarForm(false)}
+                  className="bg-gray-600 hover:bg-gray-700 px-6 py-3 rounded-lg font-semibold transition"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       )}
+
+      <button
+        onClick={() => navigate(-1)}
+        className="mt-6 bg-gray-600 hover:bg-gray-700 px-8 py-3 rounded-lg font-semibold transition"
+      >
+        Volver
+      </button>
     </div>
   );
 }

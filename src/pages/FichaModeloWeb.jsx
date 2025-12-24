@@ -1,444 +1,408 @@
-import React, { useState, useRef } from "react";
-import cieLogo from "../assets/Logo CIE Automotive.png";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+import React, { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { API_BASE } from "../config";
 
 export default function FichaModeloWeb() {
-  const printRef = useRef();
+  const navigate = useNavigate();
+  const { id } = useParams();
 
-  const [formData, setFormData] = useState({
+  const [rol, setRol] = useState(localStorage.getItem("rol") || "invitado");
+  const isAdmin = rol === "admin";
+
+  const [cargando, setCargando] = useState(true);
+
+  const [ficha, setFicha] = useState({
     modelo: "",
-    seccion: "",
-    fecha: "",
-    prensa: {
-      chapas: { taloSup: "", taloInf: "", preparar: "", estampar: "" },
-      presion: { op13: "", op24: "" },
-      posicionCorred: "",
-    },
+    seccion: localStorage.getItem("seccionSeleccionada") || "",
+    fecha: new Date().toISOString().split("T")[0],
+
+    chapas: { taloSup: "", taloInf: "", preparar: "", estampar: "" },
+    presion: { op1y3: "", op2y4: "", posCorred: "" },
+
     lubricacion: {
-      op1: { agua1: "", agua2: "", graf1: "", graf2: "", aire1: "", aire2: "" },
-      op2: { agua1: "", agua2: "", graf1: "", graf2: "", aire1: "", aire2: "" },
-      op3: { agua1: "", agua2: "", graf1: "", graf2: "", aire1: "", aire2: "" },
-      op4: { agua1: "", agua2: "", graf1: "", graf2: "", aire1: "", aire2: "" },
+      op1: Array(6).fill(""),
+      op2: Array(6).fill(""),
+      op3: Array(6).fill(""),
+      op4: Array(6).fill(""),
     },
+
     expulsores: {
-      op1: ["", "", "", "", "", ""],
-      op2: ["", "", "", "", "", ""],
-      op3: ["", "", "", "", "", ""],
-      op4: ["", "", "", "", "", ""],
+      op1: Array(6).fill(""),
+      op2: Array(6).fill(""),
+      op3: Array(6).fill(""),
+      op4: Array(6).fill(""),
     },
-    horno: { bobina1: "", bobina2: "", bobina3: "", tiempo: "" },
-    velocidadRobots: { r1: "", r2: "", r3: "" },
-    cintas: { horno: "", enfriamiento: "" },
+
+    horno: { bob1: "", bob2: "", bob3: "", tiempoCiclo: "" },
+    robots: { rob1: "", rob2: "", rob3: "" },
+    cintas: { hornoIOB: "", enfriamiento: "" },
+
     hornoIOB: {
       preCamara: "",
-      c1: "",
-      c2: "",
-      c3: "",
-      c4: "",
-      c5: "",
-      c6: "",
-      tiempo: "",
+      cam1: "",
+      cam2: "",
+      cam3: "",
+      cam4: "",
+      cam5: "",
+      cam6: "",
+      tiempoCiclo: "",
     },
+
     observaciones: "",
   });
 
-  const handleChange = (path, value) => {
-    const keys = path.split(".");
-    setFormData((prev) => {
-      const updated = { ...prev };
-      let temp = updated;
-      for (let i = 0; i < keys.length - 1; i++) {
-        temp[keys[i]] = { ...temp[keys[i]] };
-        temp = temp[keys[i]];
+  useEffect(() => {
+    const syncRol = () => setRol(localStorage.getItem("rol") || "invitado");
+    syncRol();
+    window.addEventListener("storage", syncRol);
+    return () => window.removeEventListener("storage", syncRol);
+  }, []);
+
+  useEffect(() => {
+    const fetchFicha = async () => {
+      setCargando(true);
+      try {
+        const res = await fetch(`${API_BASE}/api/modelos/${id}`);
+        if (!res.ok) throw new Error("No se pudo cargar la ficha");
+        const data = await res.json();
+
+        // Si el backend guarda ficha_json:
+        if (data?.ficha_json) {
+          const parsed = JSON.parse(data.ficha_json);
+          setFicha((prev) => ({
+            ...prev,
+            ...parsed,
+            seccion: parsed.seccion || data.seccion || prev.seccion,
+            modelo: parsed.modelo || data.modelo || data.nombre || prev.modelo,
+          }));
+        } else {
+          // fallback si no hay ficha_json
+          setFicha((prev) => ({
+            ...prev,
+            modelo: data.modelo || data.nombre || prev.modelo,
+            seccion: data.seccion || prev.seccion,
+          }));
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setCargando(false);
       }
-      temp[keys[keys.length - 1]] = value;
+    };
+
+    fetchFicha();
+  }, [id]);
+
+  const setField = (path, value) => {
+    setFicha((prev) => {
+      const updated = structuredClone(prev);
+      let ref = updated;
+      for (let i = 0; i < path.length - 1; i++) {
+        ref = ref[path[i]];
+      }
+      ref[path[path.length - 1]] = value;
       return updated;
     });
   };
 
-  const handleSave = async () => {
+  const guardar = async () => {
     try {
-      const response = await fetch("https://coronas-backend.onrender.com/api/modelos", {
-        method: "POST",
+      const res = await fetch(`${API_BASE}/api/modelos/${id}`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          modelo: formData.modelo,
-          seccion: formData.seccion,
-          fecha: formData.fecha,
-          ficha_json: JSON.stringify(formData),
-        }),
+        body: JSON.stringify({ ficha_json: JSON.stringify(ficha) }),
       });
-      if (response.ok) alert("✅ Ficha guardada correctamente");
-      else alert("❌ Error al guardar la ficha");
-    } catch {
-      alert("⚠️ Error de conexión con el servidor");
+      if (!res.ok) throw new Error("PUT falló");
+      alert("✅ Guardado correctamente");
+    } catch (e) {
+      console.error(e);
+      alert("❌ Error al guardar");
     }
   };
 
-  const handlePrint = async () => {
-    const pdf = new jsPDF("p", "mm", "a4");
-    const pageWidth = pdf.internal.pageSize.getWidth();
-
-    const sections = printRef.current.querySelectorAll("section");
-    let firstPage = true;
-
-    for (const section of sections) {
-      const canvas = await html2canvas(section, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: "#ffffff",
-      });
-
-      const imgData = canvas.toDataURL("image/png");
-      const imgProps = pdf.getImageProperties(imgData);
-      const pdfHeight = (imgProps.height * pageWidth) / imgProps.width;
-
-      if (!firstPage) pdf.addPage();
-      pdf.addImage(imgData, "PNG", 0, 0, pageWidth, pdfHeight);
-      firstPage = false;
-    }
-
-    pdf.save(`Ficha_${formData.modelo || "sin_nombre"}.pdf`);
-  };
-
-  const colors = {
-    generales: "bg-blue-50",
-    prensa: "bg-emerald-50",
-    lubricacion: "bg-amber-50",
-    expulsores: "bg-purple-50",
-    horno: "bg-teal-50",
-    robots: "bg-orange-50",
-    cintas: "bg-lime-50",
-    hornoIOB: "bg-sky-50",
-    observaciones: "bg-gray-50",
-  };
+  if (cargando) {
+    return (
+      <div className="min-h-screen bg-[#0f172a] text-white flex items-center justify-center">
+        <p className="text-gray-300">Cargando ficha…</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 p-6 overflow-y-auto">
-      <div
-        ref={printRef}
-        className="max-w-7xl mx-auto bg-white shadow-2xl rounded-2xl p-10 border border-gray-300 space-y-10"
-      >
-        {/* CABECERA */}
-        <header className="flex items-center justify-between border-b pb-4 mb-6">
-          <div className="flex items-center gap-4">
-            <img src={cieLogo} alt="CIE Automotive" className="h-12" />
-            <h1 className="text-3xl font-bold text-gray-800 tracking-wide">
-              Coronas — <span className="text-blue-600">Puesta a Punto</span>
-            </h1>
-          </div>
-        </header>
+    <div className="min-h-screen bg-[#0f172a] text-white p-8 flex flex-col items-center">
+      <h1 className="text-3xl font-bold text-cyan-400 mb-6">
+        FICHA MODELO - {ficha.modelo || "Sin nombre"}
+      </h1>
 
-        {/* === SECCIONES === */}
-        {[
-          { key: "generales", title: "Datos Generales" },
-          { key: "prensa", title: "Prensa" },
-          { key: "lubricacion", title: "Lubricación" },
-          { key: "expulsores", title: "Expulsores" },
-          { key: "horno", title: "Horno" },
-          { key: "robots", title: "Velocidad Robots" },
-          { key: "cintas", title: "Cintas" },
-          { key: "hornoIOB", title: "Horno IOB" },
-          { key: "observaciones", title: "Observaciones" },
-        ].map(({ key, title }) => (
-          <section key={key} className={`${colors[key]} rounded-lg p-6 shadow-sm`}>
-            <h2 className="text-2xl font-semibold mb-5 text-center">{title}</h2>
+      {/* DATOS GENERALES */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
+        <div>
+          <label className="block text-sm mb-1">MODELO</label>
+          <input
+            value={ficha.modelo}
+            onChange={(e) => setField(["modelo"], e.target.value)}
+            readOnly={!isAdmin}
+            className="w-full rounded-lg p-2 text-black"
+          />
+        </div>
 
-            {/* === Datos Generales === */}
-            {key === "generales" && (
-              <div className="grid grid-cols-3 gap-8 text-center">
-                {["modelo", "seccion", "fecha"].map((field) => (
-                  <div key={field}>
-                    <label className="block text-base font-medium text-gray-700 mb-2">
-                      {field.toUpperCase()}
-                    </label>
-                    <input
-                      type="text"
-                      className="border p-2 rounded-md text-center w-52 shadow-sm"
-                      value={formData[field]}
-                      onChange={(e) => handleChange(field, e.target.value)}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
+        <div>
+          <label className="block text-sm mb-1">SECCIÓN</label>
+          <input
+            value={ficha.seccion}
+            readOnly
+            className="w-full rounded-lg p-2 bg-gray-700 text-gray-200 cursor-not-allowed"
+          />
+        </div>
 
-            {/* === Prensa === */}
-            {key === "prensa" && (
-              <>
-                <h3 className="text-lg font-semibold mb-2 text-center">Chapas</h3>
-                <div className="grid grid-cols-4 gap-4 text-center">
-                  {["TALO SUP", "TALO INF", "PREPARAR", "ESTAMPAR"].map((campo, i) => {
-                    const keys = ["taloSup", "taloInf", "preparar", "estampar"];
-                    return (
-                      <div key={campo}>
-                        <label className="text-sm font-medium text-gray-700 mb-1">{campo}</label>
-                        <input
-                          type="text"
-                          className="border p-2 rounded-md text-center w-36 shadow-sm"
-                          value={formData.prensa.chapas[keys[i]]}
-                          onChange={(e) =>
-                            handleChange(`prensa.chapas.${keys[i]}`, e.target.value)
-                          }
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
+        <div>
+          <label className="block text-sm mb-1">FECHA</label>
+          <input
+            type="date"
+            value={ficha.fecha}
+            onChange={(e) => setField(["fecha"], e.target.value)}
+            readOnly={!isAdmin}
+            className="w-full rounded-lg p-2 text-black"
+          />
+        </div>
+      </section>
 
-                {/* === Presión === */}
-                <h3 className="text-lg font-semibold mt-6 mb-4 text-center">Presión</h3>
-                <div className="flex justify-center gap-16 items-center">
-                  {["1ºOP + 3ºOP", "2ºOP + 4ºOP"].map((campo, i) => {
-                    const keys = ["op13", "op24"];
-                    return (
-                      <div key={campo} className="flex flex-col items-center">
-                        <label className="text-sm font-medium text-gray-700 mb-2">{campo}</label>
-                        <input
-                          type="text"
-                          className="border p-2 rounded-md text-center w-40 shadow-sm"
-                          value={formData.prensa.presion[keys[i]]}
-                          onChange={(e) =>
-                            handleChange(`prensa.presion.${keys[i]}`, e.target.value)
-                          }
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
+      {/* PRENSA */}
+      <section className="w-full max-w-5xl bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
+        <h2 className="text-2xl font-semibold text-cyan-400 mb-4">PRENSA</h2>
 
-                {/* === Posición Corredora === */}
-                <h3 className="text-lg font-semibold mt-6 mb-2 text-center">
-                  Posición Corredora
-                </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* CHAPAS */}
+          <div>
+            <h3 className="text-lg font-semibold mb-2 text-center">CHAPAS</h3>
+
+            {[
+              ["TALO SUP", "taloSup"],
+              ["TALO INF", "taloInf"],
+              ["PREPARAR", "preparar"],
+              ["ESTAMPAR", "estampar"],
+            ].map(([label, key]) => (
+              <div key={key} className="flex items-center mb-3">
+                <label className="w-32 text-sm">{label}</label>
                 <input
-                  type="text"
-                  className="border p-2 rounded-md text-center w-60 mx-auto block shadow-sm"
-                  value={formData.prensa.posicionCorred}
-                  onChange={(e) => handleChange("prensa.posicionCorred", e.target.value)}
+                  value={ficha.chapas[key]}
+                  onChange={(e) => setField(["chapas", key], e.target.value)}
+                  readOnly={!isAdmin}
+                  className="flex-1 rounded-lg p-2 text-black"
                 />
-              </>
-            )}
-
-            {/* === Lubricación === */}
-            {key === "lubricacion" && (
-              <>
-                {["op1", "op2", "op3", "op4"].map((op, i) => (
-                  <div key={op} className="mb-8 text-center">
-                    <h3 className="font-semibold mb-2 text-lg">{`${i + 1}º OP`}</h3>
-                    <div className="grid grid-cols-3 gap-8 justify-items-center">
-                      {["Agua", "Grafito", "Aire"].map((tipo) => (
-                        <div key={tipo} className="flex flex-col items-center">
-                          <label className="text-sm font-medium text-gray-700 mb-2 block">
-                            {tipo}
-                          </label>
-                          <div className="flex flex-col gap-2">
-                            {[1, 2].map((n) => (
-                              <input
-                                key={n}
-                                type="text"
-                                className="border p-2 rounded-md text-center w-28 shadow-sm"
-                                value={formData.lubricacion[op][`${tipo.toLowerCase()}${n}`]}
-                                onChange={(e) =>
-                                  handleChange(
-                                    `lubricacion.${op}.${tipo.toLowerCase()}${n}`,
-                                    e.target.value
-                                  )
-                                }
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </>
-            )}
-
-            {/* === Expulsores === */}
-            {key === "expulsores" && (
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-center">
-                  <thead>
-                    <tr>
-                      <th></th>
-                      {["1º OP", "2º OP", "3º OP", "4º OP"].map((op) => (
-                        <th key={op}>{op}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {["COTA SUP", "CONTA INF", "1%", "2%", "V1%", "V2%"].map((label, idx) => (
-                      <tr key={label}>
-                        <td className="font-medium text-gray-700">{label}</td>
-                        {Object.keys(formData.expulsores).map((op) => (
-                          <td key={op}>
-                            <input
-                              type="text"
-                              className="border rounded-md text-center w-24 p-1 shadow-sm"
-                              value={formData.expulsores[op][idx]}
-                              onChange={(e) => {
-                                const newExp = [...formData.expulsores[op]];
-                                newExp[idx] = e.target.value;
-                                handleChange(`expulsores.${op}`, newExp);
-                              }}
-                            />
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               </div>
-            )}
+            ))}
+          </div>
 
-            {/* === Horno === */}
-            {key === "horno" && (
-              <div className="grid grid-cols-4 gap-6 text-center">
-                {["BOBINA 1", "BOBINA 2", "BOBINA 3", "TIEMPO CICLO"].map((campo, i) => {
-                  const keys = ["bobina1", "bobina2", "bobina3", "tiempo"];
-                  return (
-                    <div key={campo}>
-                      <label className="text-sm font-medium text-gray-700 mb-2 block">
-                        {campo}
-                      </label>
-                      <input
-                        type="text"
-                        className="border p-2 rounded-md text-center w-32 shadow-sm"
-                        value={formData.horno[keys[i]]}
-                        onChange={(e) => handleChange(`horno.${keys[i]}`, e.target.value)}
-                      />
-                    </div>
-                  );
-                })}
+          {/* PRESION */}
+          <div>
+            <h3 className="text-lg font-semibold mb-2 text-center">
+              PRESIÓN / POS. CORREDERA
+            </h3>
+
+            {[
+              ["1ºOP + 3ºOP", "op1y3"],
+              ["2ºOP + 4ºOP", "op2y4"],
+              ["POS. CORREDERA", "posCorred"],
+            ].map(([label, key]) => (
+              <div key={key} className="flex items-center mb-3">
+                <label className="w-40 text-sm">{label}</label>
+                <input
+                  value={ficha.presion[key]}
+                  onChange={(e) => setField(["presion", key], e.target.value)}
+                  readOnly={!isAdmin}
+                  className="flex-1 rounded-lg p-2 text-black"
+                />
               </div>
-            )}
+            ))}
+          </div>
+        </div>
+      </section>
 
-            {/* === Robots === */}
-            {key === "robots" && (
-              <div className="grid grid-cols-3 gap-6 text-center">
-                {["ROBOT 1", "ROBOT 2", "ROBOT 3"].map((campo, i) => {
-                  const keys = ["r1", "r2", "r3"];
-                  return (
-                    <div key={campo}>
-                      <label className="text-sm font-medium text-gray-700 mb-2 block">
-                        {campo}
-                      </label>
-                      <input
-                        type="text"
-                        className="border p-2 rounded-md text-center w-36 shadow-sm"
-                        value={formData.velocidadRobots[keys[i]]}
-                        onChange={(e) =>
-                          handleChange(`velocidadRobots.${keys[i]}`, e.target.value)
-                        }
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+      {/* LUBRICACIÓN */}
+      <section className="w-full max-w-5xl bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
+        <h2 className="text-2xl font-semibold text-cyan-400 mb-4">LUBRICACIÓN</h2>
 
-            {/* === Cintas === */}
-            {key === "cintas" && (
-              <div className="grid grid-cols-2 gap-6 text-center">
-                {["CINTA A HORNO IOB", "CINTA ENFRIAMIENTO"].map((campo, i) => {
-                  const keys = ["horno", "enfriamiento"];
-                  return (
-                    <div key={campo}>
-                      <label className="text-sm font-medium text-gray-700 mb-2 block">
-                        {campo}
-                      </label>
-                      <input
-                        type="text"
-                        className="border p-2 rounded-md text-center w-48 shadow-sm"
-                        value={formData.cintas[keys[i]]}
-                        onChange={(e) => handleChange(`cintas.${keys[i]}`, e.target.value)}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+        {["op1", "op2", "op3", "op4"].map((op, idxOp) => (
+          <div key={op} className="mb-5">
+            <h3 className="font-semibold mb-2">{`${idxOp + 1}º OP`}</h3>
 
-            {/* === Horno IOB === */}
-            {key === "hornoIOB" && (
-              <div className="grid grid-cols-4 gap-6 text-center">
-                {[
-                  "PRE-CAMARA",
-                  "CAMARA 1",
-                  "CAMARA 2",
-                  "CAMARA 3",
-                  "CAMARA 4",
-                  "CAMARA 5",
-                  "CAMARA 6",
-                  "TIEMPO CICLO",
-                ].map((campo, i) => {
-                  const keys = [
-                    "preCamara",
-                    "c1",
-                    "c2",
-                    "c3",
-                    "c4",
-                    "c5",
-                    "c6",
-                    "tiempo",
-                  ];
-                  return (
-                    <div key={campo}>
-                      <label className="text-sm font-medium text-gray-700 mb-2 block">
-                        {campo}
-                      </label>
-                      <input
-                        type="text"
-                        className="border p-2 rounded-md text-center w-32 shadow-sm"
-                        value={formData.hornoIOB[keys[i]]}
-                        onChange={(e) =>
-                          handleChange(`hornoIOB.${keys[i]}`, e.target.value)
-                        }
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* === Observaciones === */}
-            {key === "observaciones" && (
-              <textarea
-                className="border rounded-md p-3 w-full h-32 resize-none text-center shadow-sm"
-                placeholder="Escribe aquí observaciones o notas adicionales..."
-                value={formData.observaciones}
-                onChange={(e) => handleChange("observaciones", e.target.value)}
-              />
-            )}
-          </section>
+            {/* 2 filas x 3 columnas */}
+            <div className="grid grid-cols-3 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <input
+                  key={i}
+                  value={ficha.lubricacion[op][i]}
+                  onChange={(e) => {
+                    const copy = [...ficha.lubricacion[op]];
+                    copy[i] = e.target.value;
+                    setField(["lubricacion", op], copy);
+                  }}
+                  readOnly={!isAdmin}
+                  className="rounded-lg p-2 text-black"
+                />
+              ))}
+            </div>
+          </div>
         ))}
-      </div>
+      </section>
 
-      {/* BOTONES */}
-      <div className="max-w-7xl mx-auto flex justify-end gap-4 mt-8">
+      {/* EXPULSORES */}
+      <section className="w-full max-w-5xl bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
+        <h2 className="text-2xl font-semibold text-cyan-400 mb-4">EXPULSORES</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {["op1", "op2", "op3", "op4"].map((op, idxOp) => (
+            <div key={op}>
+              <h3 className="font-semibold mb-2 text-center">{`${idxOp + 1}º OP`}</h3>
+              {["COTA SUP", "COTA INF", "1%", "2%", "V1%", "V2%"].map((lbl, i) => (
+                <div key={lbl} className="mb-2">
+                  <label className="text-xs mb-1 block">{lbl}</label>
+                  <input
+                    value={ficha.expulsores[op][i]}
+                    onChange={(e) => {
+                      const copy = [...ficha.expulsores[op]];
+                      copy[i] = e.target.value;
+                      setField(["expulsores", op], copy);
+                    }}
+                    readOnly={!isAdmin}
+                    className="w-full rounded-lg p-2 text-black"
+                  />
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* HORNO */}
+      <section className="w-full max-w-5xl bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
+        <h2 className="text-2xl font-semibold text-cyan-400 mb-4">HORNO</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[
+            ["Bobina 1", "bob1"],
+            ["Bobina 2", "bob2"],
+            ["Bobina 3", "bob3"],
+            ["Tiempo Ciclo", "tiempoCiclo"],
+          ].map(([lbl, key]) => (
+            <div key={key}>
+              <label className="block text-sm mb-1">{lbl}</label>
+              <input
+                value={ficha.horno[key]}
+                onChange={(e) => setField(["horno", key], e.target.value)}
+                readOnly={!isAdmin}
+                className="w-full rounded-lg p-2 text-black"
+              />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ROBOTS */}
+      <section className="w-full max-w-5xl bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
+        <h2 className="text-2xl font-semibold text-cyan-400 mb-4">VELOCIDAD ROBOTS</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[
+            ["Robot 1", "rob1"],
+            ["Robot 2", "rob2"],
+            ["Robot 3", "rob3"],
+          ].map(([lbl, key]) => (
+            <div key={key}>
+              <label className="block text-sm mb-1">{lbl}</label>
+              <input
+                value={ficha.robots[key]}
+                onChange={(e) => setField(["robots", key], e.target.value)}
+                readOnly={!isAdmin}
+                className="w-full rounded-lg p-2 text-black"
+              />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* CINTAS */}
+      <section className="w-full max-w-5xl bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
+        <h2 className="text-2xl font-semibold text-cyan-400 mb-4">CINTAS</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[
+            ["Cinta a Horno IOB", "hornoIOB"],
+            ["Cinta Enfriamiento", "enfriamiento"],
+          ].map(([lbl, key]) => (
+            <div key={key}>
+              <label className="block text-sm mb-1">{lbl}</label>
+              <input
+                value={ficha.cintas[key]}
+                onChange={(e) => setField(["cintas", key], e.target.value)}
+                readOnly={!isAdmin}
+                className="w-full rounded-lg p-2 text-black"
+              />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* HORNO IOB */}
+      <section className="w-full max-w-5xl bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
+        <h2 className="text-2xl font-semibold text-cyan-400 mb-4">HORNO IOB</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[
+            ["Pre-Cámara", "preCamara"],
+            ["Cámara 1", "cam1"],
+            ["Cámara 2", "cam2"],
+            ["Cámara 3", "cam3"],
+            ["Cámara 4", "cam4"],
+            ["Cámara 5", "cam5"],
+            ["Cámara 6", "cam6"],
+            ["Tiempo Ciclo", "tiempoCiclo"],
+          ].map(([lbl, key]) => (
+            <div key={key}>
+              <label className="block text-sm mb-1">{lbl}</label>
+              <input
+                value={ficha.hornoIOB[key]}
+                onChange={(e) => setField(["hornoIOB", key], e.target.value)}
+                readOnly={!isAdmin}
+                className="w-full rounded-lg p-2 text-black"
+              />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* OBSERVACIONES */}
+      <section className="w-full max-w-5xl bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
+        <h2 className="text-2xl font-semibold text-cyan-400 mb-4">OBSERVACIONES</h2>
+        <textarea
+          value={ficha.observaciones}
+          onChange={(e) => setField(["observaciones"], e.target.value)}
+          readOnly={!isAdmin}
+          className="w-full rounded-lg p-3 text-black min-h-[120px]"
+        />
+      </section>
+
+      <div className="flex gap-4 mt-6">
         <button
-          onClick={handleSave}
-          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition shadow-md"
+          onClick={() => navigate(-1)}
+          className="bg-gray-600 hover:bg-gray-700 px-8 py-3 rounded-lg font-semibold transition"
         >
-          💾 Guardar Ficha
+          Volver
         </button>
 
-        <button
-          onClick={handlePrint}
-          className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition shadow-md"
-        >
-          🖨️ Imprimir Ficha
-        </button>
+        {isAdmin && (
+          <button
+            onClick={guardar}
+            className="bg-cyan-600 hover:bg-cyan-700 px-8 py-3 rounded-lg font-semibold transition"
+          >
+            Guardar cambios
+          </button>
+        )}
 
         <button
-          onClick={() => (window.location.href = "/")}
-          className="bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600 transition shadow-md"
+          onClick={() => window.print()}
+          className="bg-green-600 hover:bg-green-700 px-8 py-3 rounded-lg font-semibold transition"
         >
-          ↩️ Volver al Dashboard
+          Imprimir
         </button>
       </div>
     </div>
