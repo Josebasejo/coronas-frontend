@@ -1,3 +1,2 @@
 // frontend/src/config.js
-
-export const API_BASE = "http://coronas-backend1.onrender.com";
+export const API_BASE = "https://coronas-backend-1.onrender.com";
