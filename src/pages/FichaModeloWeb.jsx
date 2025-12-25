@@ -249,7 +249,7 @@ export default function FichaModeloWeb() {
 
       {/* EXPULSORES */}
       <section className="w-full max-w-5xl bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
-        <h2 className="text-2xl font-semibold text-cyan-400 mb-4">EXPULSORES</h2>
+        <h2 className="text-2xl font-semibold text-cyan-400 mb-4">EXPULSADORES</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {["op1", "op2", "op3", "op4"].map((op, idxOp) => (

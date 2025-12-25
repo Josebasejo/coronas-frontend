@@ -21,7 +21,7 @@ export default function DashboardInvitado({ actualizarRol }) {
       <img src={logo} alt="CIE Automotive" className="w-64 mb-8 select-none" />
 
       <h1 className="text-4xl font-bold text-cyan-400 mb-8 tracking-wide">
-        CORONAS - Puesta a Punto
+        Apuntes De Joseba
       </h1>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
