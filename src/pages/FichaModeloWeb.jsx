@@ -51,6 +51,20 @@ export default function FichaModeloWeb() {
     observaciones: "",
   });
 
+  // ✅ helper: soporta ficha_json como string (legacy) o como objeto (Supabase jsonb)
+  const parseFichaJson = (raw) => {
+    if (!raw) return null;
+    if (typeof raw === "object") return raw; // Supabase jsonb
+    if (typeof raw === "string") {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
+
   useEffect(() => {
     const syncRol = () => setRol(localStorage.getItem("rol") || "invitado");
     syncRol();
@@ -66,14 +80,16 @@ export default function FichaModeloWeb() {
         if (!res.ok) throw new Error("No se pudo cargar la ficha");
         const data = await res.json();
 
-        // Si el backend guarda ficha_json:
-        if (data?.ficha_json) {
-          const parsed = JSON.parse(data.ficha_json);
+        // ✅ Si el backend guarda ficha_json (Supabase: objeto | legacy: string)
+        const parsed = parseFichaJson(data?.ficha_json);
+
+        if (parsed) {
           setFicha((prev) => ({
             ...prev,
             ...parsed,
             seccion: parsed.seccion || data.seccion || prev.seccion,
             modelo: parsed.modelo || data.modelo || data.nombre || prev.modelo,
+            fecha: parsed.fecha || data.fecha || prev.fecha,
           }));
         } else {
           // fallback si no hay ficha_json
@@ -81,6 +97,7 @@ export default function FichaModeloWeb() {
             ...prev,
             modelo: data.modelo || data.nombre || prev.modelo,
             seccion: data.seccion || prev.seccion,
+            fecha: data.fecha || prev.fecha,
           }));
         }
       } catch (e) {
@@ -91,7 +108,7 @@ export default function FichaModeloWeb() {
     };
 
     fetchFicha();
-  }, [id]);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setField = (path, value) => {
     setFicha((prev) => {
@@ -110,7 +127,8 @@ export default function FichaModeloWeb() {
       const res = await fetch(`${API_BASE}/api/modelos/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ficha_json: JSON.stringify(ficha) }),
+        // ✅ enviar como objeto para jsonb (tu backend lo acepta y lo guarda bien)
+        body: JSON.stringify({ ficha_json: ficha }),
       });
       if (!res.ok) throw new Error("PUT falló");
       alert("✅ Guardado correctamente");
