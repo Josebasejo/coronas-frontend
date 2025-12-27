@@ -6,6 +6,35 @@ function getNombreModelo(m) {
   return m?.modelo || m?.nombre || m?.Modelo || m?.Nombre || "";
 }
 
+/** ✅ Loader dinámico: spinner + skeleton cards */
+function LoadingModelos({ titulo = "Cargando modelos" }) {
+  return (
+    <div className="w-full">
+      <div className="flex items-center justify-center gap-3 mb-4">
+        <div className="h-5 w-5 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin" />
+        <p className="text-gray-300 font-medium">{titulo}…</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            className="bg-gray-800/60 border border-gray-700 rounded-xl p-4 shadow animate-pulse"
+          >
+            <div className="h-4 w-1/2 bg-gray-700 rounded mb-3" />
+            <div className="h-3 w-2/3 bg-gray-700 rounded mb-2" />
+            <div className="h-3 w-1/3 bg-gray-700 rounded" />
+            <div className="mt-4 flex gap-2">
+              <div className="h-9 w-24 bg-gray-700 rounded-lg" />
+              <div className="h-9 w-24 bg-gray-700 rounded-lg" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function SeccionPage() {
   const navigate = useNavigate();
   const { seccion } = useParams();
@@ -117,7 +146,7 @@ export default function SeccionPage() {
 
       <div className="w-full max-w-4xl bg-gray-800 p-6 rounded-xl shadow-lg">
         {cargando ? (
-          <p className="text-gray-400 text-center">Cargando modelos…</p>
+          <LoadingModelos />
         ) : modelos.length === 0 ? (
           <p className="text-gray-400 text-center">
             No hay modelos registrados en esta sección.
