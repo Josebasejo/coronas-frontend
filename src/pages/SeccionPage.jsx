@@ -35,6 +35,73 @@ function LoadingModelos({ titulo = "Cargando modelos" }) {
   );
 }
 
+/** ✅ Toasts (sin librerías) */
+function ToastStack({ toasts, onClose }) {
+  const styleByType = (type) => {
+    switch (type) {
+      case "success":
+        return "border-green-500/40 bg-green-500/10 text-green-100";
+      case "error":
+        return "border-red-500/40 bg-red-500/10 text-red-100";
+      case "info":
+      default:
+        return "border-cyan-500/40 bg-cyan-500/10 text-cyan-100";
+    }
+  };
+
+  const iconByType = (type) => {
+    switch (type) {
+      case "success":
+        return "✅";
+      case "error":
+        return "❌";
+      case "info":
+      default:
+        return "ℹ️";
+    }
+  };
+
+  return (
+    <div className="fixed top-5 right-5 z-50 flex flex-col gap-3 w-[320px] max-w-[90vw]">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className={[
+            "rounded-xl border shadow-lg backdrop-blur",
+            "px-4 py-3 flex gap-3 items-start",
+            "animate-[toastIn_200ms_ease-out]",
+            styleByType(t.type),
+          ].join(" ")}
+        >
+          <div className="text-lg leading-none mt-0.5">{iconByType(t.type)}</div>
+
+          <div className="flex-1">
+            <div className="text-sm font-semibold">{t.title || "Notificación"}</div>
+            <div className="text-sm opacity-90">{t.message}</div>
+          </div>
+
+          <button
+            onClick={() => onClose(t.id)}
+            className="text-white/70 hover:text-white transition text-lg leading-none"
+            aria-label="Cerrar"
+            title="Cerrar"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+
+      {/* Animación CSS inline (Tailwind no tiene keyframes personalizados por defecto en CRA) */}
+      <style>{`
+        @keyframes toastIn {
+          from { transform: translateY(-6px); opacity: 0; }
+          to   { transform: translateY(0); opacity: 1; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 export default function SeccionPage() {
   const navigate = useNavigate();
   const { seccion } = useParams();
@@ -48,6 +115,23 @@ export default function SeccionPage() {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [nuevoModelo, setNuevoModelo] = useState("");
   const [nuevoCliente, setNuevoCliente] = useState("");
+
+  // ✅ Toast state
+  const [toasts, setToasts] = useState([]);
+
+  const pushToast = (type, title, message, ms = 2800) => {
+    const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const toast = { id, type, title, message };
+    setToasts((prev) => [...prev, toast]);
+
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, ms);
+  };
+
+  const closeToast = (id) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
 
   useEffect(() => {
     if (seccion) localStorage.setItem("seccionSeleccionada", seccion);
@@ -70,6 +154,7 @@ export default function SeccionPage() {
     } catch (e) {
       console.error(e);
       setModelos([]);
+      pushToast("error", "Error", "No se pudo cargar la lista de modelos.");
     } finally {
       setCargando(false);
     }
@@ -92,10 +177,10 @@ export default function SeccionPage() {
       const res = await fetch(`${API_BASE}/api/modelos/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("DELETE falló");
       setModelos((prev) => prev.filter((m) => m.id !== id));
-      alert("✅ Eliminado correctamente");
+      pushToast("success", "Eliminado", `Modelo "${nombreMostrado}" eliminado correctamente.`);
     } catch (e) {
       console.error(e);
-      alert("❌ Error al eliminar");
+      pushToast("error", "Error", "No se pudo eliminar el modelo.");
     }
   };
 
@@ -107,7 +192,7 @@ export default function SeccionPage() {
     const cliente = nuevoCliente.trim();
 
     if (!modelo) {
-      alert("❌ El nombre de modelo es obligatorio.");
+      pushToast("error", "Falta el modelo", "El nombre de modelo es obligatorio.");
       return;
     }
 
@@ -133,15 +218,18 @@ export default function SeccionPage() {
       setNuevoCliente("");
       setMostrarForm(false);
       await cargarModelos();
-      alert(`✅ Modelo "${modelo}" creado correctamente.`);
+      pushToast("success", "Creado", `Modelo "${modelo}" creado correctamente.`);
     } catch (e2) {
       console.error(e2);
-      alert("❌ Error al crear el modelo.");
+      pushToast("error", "Error", "No se pudo crear el modelo.");
     }
   };
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-white p-8 flex flex-col items-center">
+      {/* ✅ Toasts */}
+      <ToastStack toasts={toasts} onClose={closeToast} />
+
       <h1 className="text-3xl font-bold text-cyan-400 mb-6">SECCIÓN {seccion}</h1>
 
       <div className="w-full max-w-4xl bg-gray-800 p-6 rounded-xl shadow-lg">
