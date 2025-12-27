@@ -91,13 +91,63 @@ function ToastStack({ toasts, onClose }) {
         </div>
       ))}
 
-      {/* Animación CSS inline (Tailwind no tiene keyframes personalizados por defecto en CRA) */}
       <style>{`
         @keyframes toastIn {
           from { transform: translateY(-6px); opacity: 0; }
           to   { transform: translateY(0); opacity: 1; }
         }
       `}</style>
+    </div>
+  );
+}
+
+/** ✅ Modal confirmación eliminar */
+function ConfirmDeleteModal({ open, nombre, onCancel, onConfirm, loading }) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center px-4">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/60"
+        onClick={loading ? undefined : onCancel}
+      />
+
+      {/* Panel */}
+      <div className="relative w-full max-w-md rounded-2xl border border-gray-700 bg-[#0b1224] shadow-2xl p-6">
+        <div className="flex items-start gap-3">
+          <div className="h-10 w-10 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center">
+            <span className="text-red-300 text-xl">⚠️</span>
+          </div>
+
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-white">Eliminar modelo</h3>
+            <p className="text-sm text-gray-300 mt-1">
+              Vas a eliminar <span className="font-semibold text-white">"{nombre}"</span>.
+              <br />
+              Esto eliminará el registro y su ficha asociada.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 flex gap-3 justify-end">
+          <button
+            onClick={onCancel}
+            disabled={loading}
+            className="px-5 py-2.5 rounded-xl bg-gray-700 hover:bg-gray-600 transition font-semibold disabled:opacity-60"
+          >
+            Cancelar
+          </button>
+
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 transition font-semibold disabled:opacity-60"
+          >
+            {loading ? "Eliminando…" : "Eliminar"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -133,6 +183,11 @@ export default function SeccionPage() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
+  // ✅ Modal delete state
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState({ id: null, nombre: "" });
+
   useEffect(() => {
     if (seccion) localStorage.setItem("seccionSeleccionada", seccion);
   }, [seccion]);
@@ -165,22 +220,37 @@ export default function SeccionPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seccion]);
 
-  const handleEliminar = async (id, nombreMostrado) => {
+  const pedirEliminar = (id, nombreMostrado) => {
     if (!isAdmin) return;
+    setDeleteTarget({ id, nombre: nombreMostrado });
+    setDeleteOpen(true);
+  };
 
-    const ok = window.confirm(
-      `¿Seguro que deseas eliminar "${nombreMostrado}"?\n\nSe eliminará el registro y su ficha asociada.`
-    );
-    if (!ok) return;
+  const cancelarEliminar = () => {
+    if (deleteLoading) return;
+    setDeleteOpen(false);
+    setDeleteTarget({ id: null, nombre: "" });
+  };
 
+  const confirmarEliminar = async () => {
+    if (!isAdmin || !deleteTarget?.id) return;
+
+    setDeleteLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/modelos/${id}`, { method: "DELETE" });
+      const res = await fetch(`${API_BASE}/api/modelos/${deleteTarget.id}`, {
+        method: "DELETE",
+      });
       if (!res.ok) throw new Error("DELETE falló");
-      setModelos((prev) => prev.filter((m) => m.id !== id));
-      pushToast("success", "Eliminado", `Modelo "${nombreMostrado}" eliminado correctamente.`);
+
+      setModelos((prev) => prev.filter((m) => m.id !== deleteTarget.id));
+      pushToast("success", "Eliminado", `Modelo "${deleteTarget.nombre}" eliminado correctamente.`);
+      setDeleteOpen(false);
+      setDeleteTarget({ id: null, nombre: "" });
     } catch (e) {
       console.error(e);
       pushToast("error", "Error", "No se pudo eliminar el modelo.");
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -230,6 +300,15 @@ export default function SeccionPage() {
       {/* ✅ Toasts */}
       <ToastStack toasts={toasts} onClose={closeToast} />
 
+      {/* ✅ Modal eliminar */}
+      <ConfirmDeleteModal
+        open={deleteOpen}
+        nombre={deleteTarget.nombre}
+        onCancel={cancelarEliminar}
+        onConfirm={confirmarEliminar}
+        loading={deleteLoading}
+      />
+
       <h1 className="text-3xl font-bold text-cyan-400 mb-6">SECCIÓN {seccion}</h1>
 
       <div className="w-full max-w-4xl bg-gray-800 p-6 rounded-xl shadow-lg">
@@ -262,7 +341,7 @@ export default function SeccionPage() {
 
                     {isAdmin && (
                       <button
-                        onClick={() => handleEliminar(m.id, nombreMostrado)}
+                        onClick={() => pedirEliminar(m.id, nombreMostrado)}
                         className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg font-semibold transition"
                       >
                         Eliminar
