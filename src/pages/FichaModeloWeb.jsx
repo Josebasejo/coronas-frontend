@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { API_BASE } from "../config";
+import Ficha1207 from "./fichas/Ficha1207";
 
 /** ✅ Toasts (sin librerías) */
 function ToastStack({ toasts, onClose }) {
@@ -126,7 +127,6 @@ export default function FichaModeloWeb() {
 
   const [rol, setRol] = useState(localStorage.getItem("rol") || "invitado");
   const isAdmin = rol === "admin";
-
   const [cargando, setCargando] = useState(true);
 
   // ✅ Toast state
@@ -147,6 +147,37 @@ export default function FichaModeloWeb() {
   const [saving, setSaving] = useState(false);
   const pendingNavRef = useRef(null);
 
+  // ✅ helper: soporta ficha_json como string (legacy) o como objeto (Supabase jsonb)
+  const parseFichaJson = (raw) => {
+    if (!raw) return null;
+    if (typeof raw === "object") return raw; // Supabase jsonb
+    if (typeof raw === "string") {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
+
+  // ✅ normaliza lubricación (op2/op3 9 casillas; op1/op4 6)
+  const normalizeLubricacion = (lub) => {
+    const safe = lub && typeof lub === "object" ? lub : {};
+    const normOne = (arr, len) => {
+      const base = Array.isArray(arr) ? [...arr] : [];
+      while (base.length < len) base.push("");
+      if (base.length > len) base.length = len;
+      return base;
+    };
+    return {
+      op1: normOne(safe.op1, 6),
+      op2: normOne(safe.op2, 9),
+      op3: normOne(safe.op3, 9),
+      op4: normOne(safe.op4, 6),
+    };
+  };
+
   const [ficha, setFicha] = useState({
     modelo: "",
     seccion: localStorage.getItem("seccionSeleccionada") || "",
@@ -155,10 +186,11 @@ export default function FichaModeloWeb() {
     chapas: { taloSup: "", taloInf: "", preparar: "", estampar: "" },
     presion: { op1y3: "", op2y4: "", posCorred: "" },
 
+    // ✅ CAMBIO AQUÍ
     lubricacion: {
       op1: Array(6).fill(""),
-      op2: Array(6).fill(""),
-      op3: Array(6).fill(""),
+      op2: Array(9).fill(""),
+      op3: Array(9).fill(""),
       op4: Array(6).fill(""),
     },
 
@@ -187,24 +219,10 @@ export default function FichaModeloWeb() {
     observaciones: "",
   });
 
-  // ✅ helper: soporta ficha_json como string (legacy) o como objeto (Supabase jsonb)
-  const parseFichaJson = (raw) => {
-    if (!raw) return null;
-    if (typeof raw === "object") return raw; // Supabase jsonb
-    if (typeof raw === "string") {
-      try {
-        return JSON.parse(raw);
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  };
-
   // ✅ baseline para detectar cambios
   const [baseline, setBaseline] = useState(null);
   const hasChanges = useMemo(() => {
-    if (!isAdmin) return false; // Invitado no edita, no aplica modal
+    if (!isAdmin) return false;
     if (!baseline) return false;
     try {
       return JSON.stringify(ficha) !== JSON.stringify(baseline);
@@ -248,6 +266,9 @@ export default function FichaModeloWeb() {
           };
         }
 
+        // ✅ normaliza lubricación al cargar
+        nextFicha.lubricacion = normalizeLubricacion(nextFicha.lubricacion);
+
         setFicha(nextFicha);
         setBaseline(structuredClone(nextFicha));
       } catch (e) {
@@ -282,7 +303,6 @@ export default function FichaModeloWeb() {
       const res = await fetch(`${API_BASE}/api/modelos/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        // ✅ enviar como objeto para jsonb (tu backend lo acepta y lo guarda bien)
         body: JSON.stringify({ ficha_json: ficha }),
       });
 
@@ -301,20 +321,17 @@ export default function FichaModeloWeb() {
   };
 
   const intentarVolver = () => {
-    // Invitado: volver normal
     if (!isAdmin) {
       navigate(-1);
       return;
     }
 
-    // Admin: si hay cambios, mostrar modal
     if (hasChanges) {
       pendingNavRef.current = () => navigate(-1);
       setShowUnsaved(true);
       return;
     }
 
-    // Admin sin cambios
     navigate(-1);
   };
 
@@ -349,12 +366,12 @@ export default function FichaModeloWeb() {
     );
   }
 
+  const seccion = String(ficha.seccion || "").trim();
+
   return (
     <div className="min-h-screen bg-[#0f172a] text-white p-8 flex flex-col items-center">
-      {/* ✅ Toasts */}
       <ToastStack toasts={toasts} onClose={closeToast} />
 
-      {/* ✅ Modal cambios sin guardar */}
       <UnsavedChangesModal
         open={showUnsaved}
         onCancel={onCancelUnsaved}
@@ -400,219 +417,19 @@ export default function FichaModeloWeb() {
         </div>
       </section>
 
-      {/* PRENSA */}
-      <section className="w-full max-w-5xl bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
-        <h2 className="text-2xl font-semibold text-cyan-400 mb-4">PRENSA</h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* CHAPAS */}
-          <div>
-            <h3 className="text-lg font-semibold mb-2 text-center">CHAPAS</h3>
-
-            {[
-              ["TALO SUP", "taloSup"],
-              ["TALO INF", "taloInf"],
-              ["PREPARAR", "preparar"],
-              ["ESTAMPAR", "estampar"],
-            ].map(([label, key]) => (
-              <div key={key} className="flex items-center mb-3">
-                <label className="w-32 text-sm">{label}</label>
-                <input
-                  value={ficha.chapas[key]}
-                  onChange={(e) => setField(["chapas", key], e.target.value)}
-                  readOnly={!isAdmin}
-                  className="flex-1 rounded-lg p-2 text-black"
-                />
-              </div>
-            ))}
-          </div>
-
-          {/* PRESION */}
-          <div>
-            <h3 className="text-lg font-semibold mb-2 text-center">
-              PRESIÓN / POS. CORREDERA
-            </h3>
-
-            {[
-              ["1ºOP + 3ºOP", "op1y3"],
-              ["2ºOP + 4ºOP", "op2y4"],
-              ["POS. CORREDERA", "posCorred"],
-            ].map(([label, key]) => (
-              <div key={key} className="flex items-center mb-3">
-                <label className="w-40 text-sm">{label}</label>
-                <input
-                  value={ficha.presion[key]}
-                  onChange={(e) => setField(["presion", key], e.target.value)}
-                  readOnly={!isAdmin}
-                  className="flex-1 rounded-lg p-2 text-black"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* LUBRICACIÓN */}
-      <section className="w-full max-w-5xl bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
-        <h2 className="text-2xl font-semibold text-cyan-400 mb-4">LUBRICACIÓN</h2>
-
-        {["op1", "op2", "op3", "op4"].map((op, idxOp) => (
-          <div key={op} className="mb-5">
-            <h3 className="font-semibold mb-2">{`${idxOp + 1}º OP`}</h3>
-
-            {/* 2 filas x 3 columnas */}
-            <div className="grid grid-cols-3 gap-4">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <input
-                  key={i}
-                  value={ficha.lubricacion[op][i]}
-                  onChange={(e) => {
-                    const copy = [...ficha.lubricacion[op]];
-                    copy[i] = e.target.value;
-                    setField(["lubricacion", op], copy);
-                  }}
-                  readOnly={!isAdmin}
-                  className="rounded-lg p-2 text-black"
-                />
-              ))}
-            </div>
-          </div>
-        ))}
-      </section>
-
-      {/* EXPULSADORES */}
-      <section className="w-full max-w-5xl bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
-        <h2 className="text-2xl font-semibold text-cyan-400 mb-4">EXPULSADORES</h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {["op1", "op2", "op3", "op4"].map((op, idxOp) => (
-            <div key={op}>
-              <h3 className="font-semibold mb-2 text-center">{`${idxOp + 1}º OP`}</h3>
-              {["COTA SUP", "COTA INF", "1%", "2%", "V1%", "V2%"].map((lbl, i) => (
-                <div key={lbl} className="mb-2">
-                  <label className="text-xs mb-1 block">{lbl}</label>
-                  <input
-                    value={ficha.expulsores[op][i]}
-                    onChange={(e) => {
-                      const copy = [...ficha.expulsores[op]];
-                      copy[i] = e.target.value;
-                      setField(["expulsores", op], copy);
-                    }}
-                    readOnly={!isAdmin}
-                    className="w-full rounded-lg p-2 text-black"
-                  />
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* HORNO */}
-      <section className="w-full max-w-5xl bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
-        <h2 className="text-2xl font-semibold text-cyan-400 mb-4">HORNO</h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[
-            ["Bobina 1", "bob1"],
-            ["Bobina 2", "bob2"],
-            ["Bobina 3", "bob3"],
-            ["Tiempo Ciclo", "tiempoCiclo"],
-          ].map(([lbl, key]) => (
-            <div key={key}>
-              <label className="block text-sm mb-1">{lbl}</label>
-              <input
-                value={ficha.horno[key]}
-                onChange={(e) => setField(["horno", key], e.target.value)}
-                readOnly={!isAdmin}
-                className="w-full rounded-lg p-2 text-black"
-              />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ROBOTS */}
-      <section className="w-full max-w-5xl bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
-        <h2 className="text-2xl font-semibold text-cyan-400 mb-4">VELOCIDAD ROBOTS</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            ["Robot 1", "rob1"],
-            ["Robot 2", "rob2"],
-            ["Robot 3", "rob3"],
-          ].map(([lbl, key]) => (
-            <div key={key}>
-              <label className="block text-sm mb-1">{lbl}</label>
-              <input
-                value={ficha.robots[key]}
-                onChange={(e) => setField(["robots", key], e.target.value)}
-                readOnly={!isAdmin}
-                className="w-full rounded-lg p-2 text-black"
-              />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* CINTAS */}
-      <section className="w-full max-w-5xl bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
-        <h2 className="text-2xl font-semibold text-cyan-400 mb-4">CINTAS</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[
-            ["Cinta a Horno IOB", "hornoIOB"],
-            ["Cinta Enfriamiento", "enfriamiento"],
-          ].map(([lbl, key]) => (
-            <div key={key}>
-              <label className="block text-sm mb-1">{lbl}</label>
-              <input
-                value={ficha.cintas[key]}
-                onChange={(e) => setField(["cintas", key], e.target.value)}
-                readOnly={!isAdmin}
-                className="w-full rounded-lg p-2 text-black"
-              />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* HORNO IOB */}
-      <section className="w-full max-w-5xl bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
-        <h2 className="text-2xl font-semibold text-cyan-400 mb-4">HORNO IOB</h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[
-            ["Pre-Cámara", "preCamara"],
-            ["Cámara 1", "cam1"],
-            ["Cámara 2", "cam2"],
-            ["Cámara 3", "cam3"],
-            ["Cámara 4", "cam4"],
-            ["Cámara 5", "cam5"],
-            ["Cámara 6", "cam6"],
-            ["Tiempo Ciclo", "tiempoCiclo"],
-          ].map(([lbl, key]) => (
-            <div key={key}>
-              <label className="block text-sm mb-1">{lbl}</label>
-              <input
-                value={ficha.hornoIOB[key]}
-                onChange={(e) => setField(["hornoIOB", key], e.target.value)}
-                readOnly={!isAdmin}
-                className="w-full rounded-lg p-2 text-black"
-              />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* OBSERVACIONES */}
-      <section className="w-full max-w-5xl bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
-        <h2 className="text-2xl font-semibold text-cyan-400 mb-4">OBSERVACIONES</h2>
-        <textarea
-          value={ficha.observaciones}
-          onChange={(e) => setField(["observaciones"], e.target.value)}
-          readOnly={!isAdmin}
-          className="w-full rounded-lg p-3 text-black min-h-[120px]"
-        />
-      </section>
+      {/* FICHA POR SECCIÓN */}
+      {seccion === "1207" ? (
+        <Ficha1207 ficha={ficha} setField={setField} isAdmin={isAdmin} />
+      ) : (
+        <section className="w-full max-w-5xl bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
+          <h2 className="text-2xl font-semibold text-cyan-400 mb-2">
+            Ficha no definida para sección {seccion || "?"}
+          </h2>
+          <p className="text-gray-300">
+            Esta sección todavía no tiene plantilla propia.
+          </p>
+        </section>
+      )}
 
       <div className="flex gap-4 mt-6">
         <button
